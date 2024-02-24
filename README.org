@@ -1,0 +1,245 @@
+* A lite(rate) evil config
+#+begin_src sh
+  git clone https://github.com/MaxCan-Code/evil-emacs-kickstart
+  emacs --init-directory=evil-emacs-kickstart
+#+end_src
+** Sensible defaults
+Nice fonts for reading
+#+begin_src emacs-lisp
+  (use-package emacs :ensure nil
+    :hook ((special-mode . variable-pitch-mode)
+           (prog-mode . hs-minor-mode)
+           (text-mode . flyspell-mode)
+           (prog-mode . flyspell-prog-mode))
+    :custom-face (default ((nil :height 110)))
+    :init
+    (menu-bar-mode -1) (tool-bar-mode -1) (scroll-bar-mode -1)
+
+    (global-visual-line-mode) ;; basically (truncate-lines nil)
+    (global-tab-line-mode) (global-hl-line-mode) (global-prettify-symbols-mode)
+    (global-whitespace-mode) (setopt whitespace-style
+                                     (cl-substitute
+                                      'lines-tail 'lines
+                                      (cl-remove-if
+                                       (lambda (e) (cl-member e '(spaces space-mark)))
+                                       whitespace-style)))
+    (load-theme 'modus-vivendi)
+    (unless (display-graphic-p (selected-frame))
+      (set-face-attribute 'default nil :background  "unspecified-bg"))
+    (modify-all-frames-parameters '((alpha-background . 85)))
+    (menu-bar-bottom-and-right-window-divider)
+
+    (defun package--save-selected-packages (&rest opt) nil)
+    (setopt use-short-answers t
+            help-window-keep-selected t
+            echo-keystrokes 0.01
+            ;; custom-file (expand-file-name "custom.el" user-emacs-directory)
+            ;; warning-minimum-level ':error
+            initial-buffer-choice (cadr '(project-find-file t))
+            initial-scratch-message nil
+            project-mode-line t
+            allout-auto-activation t
+            vc-handled-backends '(Git)))
+
+  (electric-pair-mode) (use-package foldout :ensure nil)
+  (use-package subword :ensure nil
+    :config (global-superword-mode) (global-subword-mode))
+  (use-package icomplete :ensure nil :config (fido-mode) (fido-vertical-mode))
+  (use-package paren :ensure nil
+    :config (setopt show-paren-when-point-in-periphery t
+                    show-paren-when-point-inside-paren t
+                    show-paren-context-when-offscreen 'overlay
+                    show-paren-delay 0
+                    show-paren-style 'mixed
+                    blink-matching-paren 'jump-offscreen)
+    (show-paren-mode))
+
+  (defadvice man (before my-woman-prompt activate)
+    (interactive (progn (require 'woman) (list (woman-file-name nil)))))
+#+end_src
+** Org
+#+begin_src emacs-lisp
+  (use-package org-sticky-header :vc (:rev :newest)
+    :hook org-mode :custom (org-sticky-header-full-path 'full))
+  (use-package org :ensure nil
+    :hook (org-mode . (lambda () (imenu-add-to-menubar "Imenu")))
+    :config
+    (setopt org-use-speed-commands t
+            org-startup-indented t
+            org-startup-numerated t
+            org-startup-folded 'content
+            org-src-window-setup 'current-window
+            org-modules '(org-tempo org-habit)
+            org-latex-prefer-user-labels t
+            org-latex-default-packages-alist nil
+            org-latex-hyperref-template nil
+            org-latex-src-block-backend 'engraved
+            org-latex-pdf-process '("nextonic compile %f")
+            org-format-latex-options (plist-put org-format-latex-options :scale 4)
+            org-preview-latex-default-process 'imagemagick
+            org-preview-latex-process-alist
+            `(,(cons 'imagemagick (plist-put
+                                   (plist-put
+                                    (alist-get
+                                     'imagemagick
+                                     org-preview-latex-process-alist)
+                                    :latex-compiler '("nextonic compile -o %o %f"))
+                                   :programs '("nextonic"))))))
+  (use-package typst-mode
+    :vc (:url "https://git.sr.ht/~meow_king/typst-mode" :rev :newest))
+#+end_src
+** Nice packages
+#+begin_src emacs-lisp
+  (use-package keycast :vc (:rev :newest) :config (keycast-tab-bar-mode))
+  '(use-package combobulate :vc (:rev :newest))
+  (use-package flyspell-correct :vc (:rev :newest) :after flyspell
+    :bind (:map flyspell-mode-map ("C-M-i" . flyspell-correct-wrapper)))
+  (use-package corfu :vc (:rev :newest) :load-path "elpa/corfu/extensions"
+    :custom (corfu-auto t) (corfu-auto-delay 0) (corfu-auto-prefix 0)
+    :config (global-corfu-mode))
+  (use-package matcha :vc (:url "https://github.com/jojojames/matcha" :rev :newest)
+    :config (matcha-setup) '(use-package emr)
+    (defalias 'j-search 'tmm-menubar) ;; budget hydra
+    (defalias 'matcha-indent-region-or-buffer 'whitespace-cleanup)
+    (defalias 'matcha-me-recent 'restart-emacs)
+    (defalias 'matcha-me-swiper 'evil-command-window-search-forward)
+    (defalias 'matcha-me-search 'evil-avy-goto-word-0)
+    (defalias 'matcha-me-window 'ace-window)
+    (defun matcha-me-find-init () (interactive)
+           (ffap (expand-file-name "README.org" user-emacs-directory))))
+  (use-package ace-window :vc (:rev :newest) :custom (aw-keys '(?a ?s ?d ?f ?g ?h ?k ?l)))
+  (use-package golden-ratio :vc (:rev :newest)
+    :custom (golden-ratio-auto-scale 1) :config (golden-ratio-mode 1))
+  (use-package marginalia :vc (:rev :newest) :init (marginalia-mode))
+
+  '(use-package power-mode)
+  (use-package elisp-autofmt :commands (elisp-autofmt-mode))
+  ;; (use-package guix) (use-package geiser-guile)
+
+  (use-package eglot :ensure nil :commands (eglot)
+    :hook ((hy-mode lean4-mode idris-mode) . eglot-ensure)
+    :config
+    '(use-package hy-mode)
+    '(use-package lean4-mode
+       :vc (:url "https://github.com/leanprover/lean4-mode")
+       ;; :files ("*.el" "data")
+       :commands (lean4-mode))
+    '(use-package idris-mode
+       ;; https://github.com/idris-lang/Idris2/wiki/Editor-Support
+       :custom (idris-interpreter-path "idris2") :commands (idris-mode))
+    '(use-package agda-mode :ensure nil :commands (agda2-mode)
+       :init '(with-demoted-errors "agda-mode error: %S"
+                (load-file (shell-command-to-string "agda-mode locate"))))
+    (setopt eglot-server-programs (cl-pairlis
+                                   '(hy-mode lean4-mode idris-mode dyalog-mode)
+                                   '(("hyuga") ("lake" "serve") ("idris2-lsp") ("nc" "-l" "127.0.0.1" "55555"))
+                                   eglot-server-programs)))
+  (use-package dyalog-mode :mode ("\\.apl.\\'" "\\.dyalog\\'")
+    :vc (:url "https://github.com/11Kilobytes/dyalog-mode" :rev :newest)
+    :custom (dyalog-help-root "https://help.dyalog.com/latest/Content/"))
+  (use-package dyalog-apl-input :load-path "elpa/dyalog-apl-input/dyalog-apl-input"
+    :vc (:url "https://github.com/abochannek/Dyalog" :rev :newest)
+    :hook ((dyalog-mode dyalog-session-mode) . (lambda () (set-input-method "dyalog-apl-prefix"))))
+  (use-package bqn-mode :vc (:rev :newest)
+    :init
+    (defun toggle-bqn-keymap ()
+      "Toggle the BQN keymap display."
+      (interactive)
+      (let ((buf (get-buffer "*BQN keymap*")))
+        (if (and buf (get-buffer-window buf))
+            (progn
+              (delete-window (get-buffer-window buf))
+              (kill-buffer buf))
+          (bqn-keymap-mode-show-keyboard))))
+    (defun toggle-bqn-glyphs ()
+      "Toggle the BQN glyphs display."
+      (interactive)
+      (let ((buf (get-buffer "*BQN Glyphs*")))
+        (if (and buf (get-buffer-window buf))
+            (progn
+              (delete-window (get-buffer-window buf))
+              (kill-buffer buf))
+          (bqn-glyph-mode-show-glyphs))))
+    (defun bqn-explain-line ()
+      "Explain the current line in BQN, displaying the explanation result in the minibuffer."
+      (interactive)
+      ;; Capture the current line's content
+      (let* ((current-line (thing-at-point 'line t))
+             (command-to-explain (concat ")explain " current-line))
+             (proc (get-buffer-process (bqn-comint-buffer))))
+        ;; Use bqn-comint-evaluate-command to send the command
+        (message "%s" (bqn--comint-call-process-silently proc command-to-explain))))
+    :bind (:map bqn-mode-map
+                ("C-c i" . bqn-help-symbol-info-at-point)
+                ("C-c g" . toggle-bqn-glyphs)
+                ("C-c k" . toggle-bqn-keymap)
+                ("C-c C-e" . bqn-comint-eval-buffer)
+                ("C-x e" . bqn-explain-line)
+                ("C-x C-e" . bqn-comint-eval-dwim)))
+#+end_src
+** Evil defaults
+https://github.com/emacs-evil/evil-collection#installation
+#+begin_src emacs-lisp
+  (use-package evil :vc (:rev :newest)
+    :bind (:map evil-insert-state-map
+                ("C-<backspace>" . help-command) ("C-h" . [backspace])
+                :map evil-operator-state-map
+                ("x" . evil-avy-goto-word-0) ("X" . avy-goto-char-0-apl)
+                :map evil-normal-state-map
+                ("S" . avy-goto-char-0-apl) ("s" . evil-avy-goto-word-0)
+                ("O" . nil) ("o" . evil-command-window-ex)
+                ("X" . nil) ("x" . nil)
+                ("w" . nil) ("e" . nil) ("b" . nil)
+                ("?" . evil-command-window-search-forward)
+                ("C-w Q" . evil-quit-all)
+                ("U" . evil-redo)
+                ("g s" . evil-avy-goto-word-0)
+                ("SPC" . matcha-me-space) ("g SPC" . matcha-me-space))
+    :init
+    (setopt evil-want-keybinding nil
+            display-line-numbers-type 'visual
+            evil-want-C-u-scroll t
+            evil-want-Y-yank-to-eol t
+            evil-want-fine-undo t
+            evil-undo-system 'undo-redo
+            evil-cross-lines t
+            isearch-lazy-count t)
+    :config (global-display-line-numbers-mode)
+    (use-package avy :vc (:rev :newest)
+      :custom avy-styles-alist '((avy-goto-char . at))
+      :config
+      (defun avy-goto-char-0-apl () (interactive)
+             (avy-with avy-goto-char (avy-jump "[^ 0-9A-Za-z]"))))
+    (evil-mode 1))
+#+end_src
+https://github.com/emacs-evil/evil-collection#configuration
+#+begin_src emacs-lisp
+  (use-package evil-collection :after evil :vc (:rev :newest)
+    :custom (evil-collection-setup-minibuffer t)
+    :config (evil-collection-init))
+#+end_src
+** Evil packages
+#+begin_src emacs-lisp
+  (use-package evil-embrace :vc (:rev :newest)
+    ;; :hook ((org-mode . embrace-org-mode-hook)
+    ;;        (emacs-lisp-mode . embrace-emacs-lisp-mode-hook))
+    :config (global-evil-surround-mode)
+    (evil-embrace-enable-evil-surround-integration))
+  '(use-package evil-quickscope :vc (:rev :newest)
+     :init (setopt evil-quickscope-cross-lines t
+                   evil-quickscope-bidirectional t)
+     :config (global-evil-quickscope-always-mode 1))
+  (use-package evil-goggles :vc (:rev :newest) :config (evil-goggles-mode))
+  (use-package evil-fringe-mark :vc (:rev :newest)
+    :custom (evil-fringe-mark-show-special t)
+    :config (fringe-mode 22) (global-evil-fringe-mark-mode))
+  (use-package evil-owl :vc (:rev :newest)
+    :custom (evil-owl-idle-delay 0.4) :config (evil-owl-mode))
+#+end_src
+* Emacs stuff I starred
+might as well move them here
++ [[https://github.com/erickgnavar/evil-emacs-kickstart][erickgnavar/evil-emacs-kickstart]]
++ [[https://github.com/erikbackman/kickstart.el][erikbackman/kickstart.el]]
++ [[https://redd.it/3ql5ga][Online org-mode Editor? - r/emacs]]
++ [[https://github.com/susam/emfy][susam/emfy]]
++ [[https://github.com/snackon/Witchmacs][snackon/Witchmacs]]
